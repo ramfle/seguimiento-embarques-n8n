@@ -1,0 +1,195 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9a7f6d63-0cd2-4761-b793-ef2704e6d01e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "const correos = [\n  \"Asunto: Aviso de embarque BL MNT2611001\\nEstimado cliente: su carga sale de Montevideo el 12/11/2026 en el buque AURORA DEL SUR, con arribo estimado a Shanghái el 19/12/2026. Contenedor: ABCU1234560. BL: MNT2611001. Condición de venta: CIF. Saludos, Operaciones.\",\n\n  \"Subject: Shipping advice\\nHi, BL MNT2611002, container LOGU2048156, vessel ATLANTIC PIONEER. Departure from Montevideo on 15-Nov-26, expected arrival at Rotterdam on 06-Dec-26. Terms: FOB. Regards, Ops team.\",\n\n  \"Asunto: Demora BL MNT2611001\\nInformamos que el buque AURORA DEL SUR sufre una demora por congestión en puerto. El nuevo ETA a Shanghái es el 23/12/2026. El resto de los datos no cambia.\",\n\n  \"Asunto: Confirmación de reserva\\nHola, confirmamos reserva para el BL MNT2611003, contenedor DEMU 331709 3, buque COSTA DEL PLATA. Sale de Montevideo el 20/11/2026 hacia Hamburgo. La fecha de llegada está por confirmar. Condición: DAP.\",\n\n  \"Subject: Shipping notice\\nDear customer, Ref. 20261105 / PO 4500123987. Your cargo (BL MNT2611004) departs Montevideo on 22 November 2026 aboard NORDIC STAR, ETA Busan 02 January 2027. Container SAMU7650019. Incoterm: CFR. This message may contain confidential information. Please consider the environment before printing.\",\n\n  \"Asunto: Aviso de embarque\\nBL MNT2611005. Contenedor ABCU1234561 en el buque RIO URUGUAY. ETD Montevideo 25/11/2026, ETA Valencia 14/12/2026. Incoterm FOB.\",\n\n  \"Subject: Revised ETA - BL MNT2611002\\nDue to weather, ATLANTIC PIONEER is now expected in Rotterdam on 10-Dec-26 (previously 06-Dec-26). Other details unchanged.\",\n\n  \"Asunto: Aviso\\nBuenas! Salimos de Montevideo el 28 de noviembre con destino Santos, llegamos aprox. el 4 de diciembre. Buque: PAMPERO. Contenedor PORU4098214, BL MNT2611006. Vendido bajo FCA.\",\n\n  \"Subject: Shipping notice\\nBL MNT2611007, container NELU8812347, vessel SOUTHERN CROSS. Loading port: Montevideo. Discharge port: Antwerp. ETD: 01/12/2026. ETA: 22/12/2026. Terms of sale: CIP.\",\n\n  \"Asunto: Aviso de embarque\\nEstimado: BL MNT2611008, contenedor BRAU6000119, buque LAGUNA AZUL. Zarpa de Montevideo el 05/12/2026 y llega a Qingdao el 10/01/2027. Condición DDP. Slds.\"\n];\n\nreturn correos.map(c => ({ json: { correo: c } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "74bf3d5f-e789-4159-825b-fbf37844ebac",
+      "name": "Datos de prueba"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-flash-lite-latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        752,
+        224
+      ],
+      "id": "cd58db7f-ed3a-4ae6-b6ee-c9c83590eba1",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "KBeUIIT0hGQZCJto",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Correo: \n{{ $json.correo }}\nResponde SOLO con un objeto JSON con estas claves: bl, contenedor, buque, puerto_origen, puerto_destino, etd, eta, incoterm. Sin texto adicional y sin bloques de codigo.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Reglas:\n1. Usa solo lo que dice el correo. Si un dato no aparece, devuelve null. Nunca lo inventes ni lo deduzcas. \n2. Fechas en formato YYYY-MM-DD. Las fechas dd/mm/aaaa se leen día/mes/año. Si falta el año, asume 2026. \n3. Si el correo da una fecha nueva o revisada y menciona la anterior, usa la nueva. \n4. Ignora referencias internas, órdenes de compra y textos legales. Solo el número de BL cuenta como BL.} \n5. contenedor: cópialo sin espacios ni guiones y sin corregir ningún dígito, aunque parezca erróneo.\n 6. incoterm: solo la sigla de 3 letras en mayúsculas."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        448,
+        0
+      ],
+      "id": "985946a9-99b1-4691-95f3-877e6b756082",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const t = String($json.text ?? $json.output ?? '');\nconst limpio = t.replace(/```json|```/gi, '').trim();\n\nlet datos;\ntry {\n  datos = JSON.parse(limpio);\n} catch (e) {\n  datos = { error_parseo: true, bruto: t };\n}\nreturn { json: datos };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ],
+      "id": "3539b395-cc1a-428b-af6d-0dd5576465d0",
+      "name": "limpiar JSON",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valores de las letras según ISO 6346 (se saltan los múltiplos de 11)\nconst LETRA = {A:10,B:12,C:13,D:14,E:15,F:16,G:17,H:18,I:19,J:20,K:21,L:23,\n  M:24,N:25,O:26,P:27,Q:28,R:29,S:30,T:31,U:32,V:34,W:35,X:36,Y:37,Z:38};\n\nfunction revisarContenedor(raw) {\n  if (!raw) return null;\n  const c = String(raw).toUpperCase().replace(/[^A-Z0-9]/g, '');\n  if (!/^[A-Z]{3}[UJZ][0-9]{7}$/.test(c)) return { c, ok: false };\n  let suma = 0;\n  for (let i = 0; i < 10; i++) {\n    const v = i < 4 ? LETRA[c[i]] : Number(c[i]);\n    suma += v * Math.pow(2, i);\n  }\n  const control = (suma % 11) % 10;\n  return { c, ok: control === Number(c[10]) };\n}\n\nconst ultimo = {};   // último estado conocido de cada BL\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const d = item.json.output ?? item.json;\n  const r = revisarContenedor(d.contenedor);\n\n  const previo = d.bl ? ultimo[d.bl] : null;\n  let dias = null, alerta = '';\n  if (previo && previo.eta && d.eta) {\n    dias = Math.round((new Date(d.eta) - new Date(previo.eta)) / 86400000);\n    if (dias > 2) alerta = `ETA retrasado ${dias} días`;\n  }\n\n  if (d.bl) {\n    const nuevos = Object.fromEntries(\n      Object.entries(d).filter(([k, v]) => v !== null && v !== '')\n    );\n    ultimo[d.bl] = { ...(previo || {}), ...nuevos };\n  }\n\n  salida.push({ json: {\n    bl: d.bl, contenedor: r ? r.c : null, buque: d.buque,\n    puerto_origen: d.puerto_origen, puerto_destino: d.puerto_destino,\n    etd: d.etd, eta: d.eta, incoterm: d.incoterm,\n    estado_contenedor: !r ? 'sin dato' : (r.ok ? 'OK' : 'REVISAR'),\n    dias_demora: dias, alerta\n  }});\n}\nreturn salida;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "63915159-b887-476b-84d9-854ecb7c1d5f",
+      "name": "Validar y comparar"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "e43a9d34-9e17-48ab-b9de-cbcd195f3de4",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Datos de prueba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos de prueba": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "limpiar JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "limpiar JSON": {
+      "main": [
+        [
+          {
+            "node": "Validar y comparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar y comparar": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5ee47790-7a6b-4303-8998-64aa8273104e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fed57f25f67aa58f8d515d0ccc28a94901e18febf404a819b408a27bcf32b981"
+  },
+  "id": "VpodCoWv1UN7otuc",
+  "tags": []
+}
